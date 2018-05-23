@@ -11,6 +11,9 @@ from offregister_fab_utils.fs import cmd_avail
 def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
     run_cmd = partial(_run_command, sudo=kwargs.get('use_sudo'))
 
+    ensure_pip_version = lambda: kwargs.get('pip_version') and sudo(
+        'pip install pip=={}'.format(kwargs.get('pip_version')))
+
     if not cmd_avail('virtualenv'):
         sudo('pip install virtualenv')
 
@@ -26,19 +29,18 @@ def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
     virtual_env_dir = virtual_env[:virtual_env.rfind('/')]
     if not exists(virtual_env_dir) or not exists(virtual_env):
         run('mkdir -p "{virtual_env_dir}"'.format(virtual_env_dir=virtual_env_dir), shell_escape=False)
+        ensure_pip_version()
         if python3:
-            sudo('pip3 install -U pip')
-            # `--system-site-packages` didn't install a pip
             run_cmd('python3 -m venv "{virtual_env}"'.format(virtual_env=virtual_env),
                     shell_escape=False)
         else:
-            sudo('pip install pip==9.0.3')
             run_cmd('virtualenv "{virtual_env}"'.format(virtual_env=virtual_env), shell_escape=False)
 
     if not exists(virtual_env):
         raise ReferenceError('Virtualenv does not exist')
 
     with shell_env(VIRTUAL_ENV=virtual_env, PATH="{}/bin:$PATH".format(virtual_env)):
+        ensure_pip_version()
         return run_cmd('python --version'), run_cmd('pip --version')
 
 
