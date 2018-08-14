@@ -4,6 +4,7 @@ from fabric.api import run
 from fabric.context_managers import shell_env, cd
 from fabric.contrib.files import exists
 from fabric.operations import sudo, _run_command
+
 from offregister_fab_utils.apt import apt_depends
 from offregister_fab_utils.fs import cmd_avail
 
@@ -26,9 +27,10 @@ def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
         apt_depends('python2.7', 'python2.7-dev', 'python-dev', 'python-pip', 'python-apt',
                     'python-numpy', 'python-wheel')
 
-    virtual_env_dir = virtual_env[:virtual_env.rfind('/')]
-    if not exists(virtual_env_dir) or not exists(virtual_env):
-        run('mkdir -p "{virtual_env_dir}"'.format(virtual_env_dir=virtual_env_dir), shell_escape=False)
+    virtual_env_bin = "{virtual_env}/bin".format(virtual_env=virtual_env)
+    if not exists(virtual_env_bin):
+        run('mkdir -p "{virtual_env_dir}"'.format(virtual_env_dir=virtual_env[:virtual_env.rfind('/')]),
+            shell_escape=False)
         ensure_pip_version()
         if python3:
             run_cmd('python3 -m venv "{virtual_env}"'.format(virtual_env=virtual_env),
@@ -36,7 +38,7 @@ def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
         else:
             run_cmd('virtualenv "{virtual_env}"'.format(virtual_env=virtual_env), shell_escape=False)
 
-    if not exists(virtual_env):
+    if not exists(virtual_env_bin):
         raise ReferenceError('Virtualenv does not exist')
 
     with shell_env(VIRTUAL_ENV=virtual_env, PATH="{}/bin:$PATH".format(virtual_env)):
