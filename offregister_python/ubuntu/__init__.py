@@ -16,7 +16,7 @@ def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
         'pip install pip=={}'.format(kwargs.get('pip_version')))
 
     if not cmd_avail('virtualenv'):
-        sudo('pip install virtualenv')
+        sudo('{pkg} install virtualenv'.format(pkg='pip' if cmd_avail('pip') else 'apt-get install -y'))
 
     home = run('echo $HOME', quiet=True)
     virtual_env = virtual_env or '{home}/venvs/tflow'.format(home=home)
