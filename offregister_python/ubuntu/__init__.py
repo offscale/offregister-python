@@ -6,7 +6,6 @@ from fabric.contrib.files import exists
 from fabric.operations import sudo, _run_command
 
 from offregister_fab_utils.apt import apt_depends
-from offregister_fab_utils.fs import cmd_avail
 
 
 def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
@@ -15,23 +14,19 @@ def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
     ensure_pip_version = lambda: kwargs.get('pip_version') and sudo(
         'pip install pip=={}'.format(kwargs.get('pip_version')))
 
-    if not cmd_avail('virtualenv'):
-        sudo('{pkg} install virtualenv'.format(pkg='pip' if cmd_avail('pip') else 'apt-get install -y'))
-
     home = run('echo $HOME', quiet=True)
     virtual_env = virtual_env or '{home}/venvs/tflow'.format(home=home)
 
     if python3:
-        apt_depends('python3-numpy', 'python3-dev', 'python3-pip', 'python3-wheel', 'python3-venv')
+        apt_depends('python3-dev', 'python3-pip', 'python3-wheel', 'python3-venv')
     else:
-        apt_depends('python2.7', 'python2.7-dev', 'python-dev', 'python-pip', 'python-apt',
-                    'python-numpy', 'python-wheel')
+        apt_depends('python-dev', 'python-pip', 'python-wheel', 'python2.7', 'python2.7-dev', 'python-apt')
+        sudo('pip install virtualenv')
 
     virtual_env_bin = "{virtual_env}/bin".format(virtual_env=virtual_env)
     if not exists(virtual_env_bin):
         run('mkdir -p "{virtual_env_dir}"'.format(virtual_env_dir=virtual_env[:virtual_env.rfind('/')]),
             shell_escape=False)
-        ensure_pip_version()
         if python3:
             run_cmd('python3 -m venv "{virtual_env}"'.format(virtual_env=virtual_env),
                     shell_escape=False)
@@ -43,7 +38,8 @@ def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
 
     with shell_env(VIRTUAL_ENV=virtual_env, PATH="{}/bin:$PATH".format(virtual_env)):
         ensure_pip_version()
-        return run_cmd('python --version'), run_cmd('pip --version')
+        run_cmd('pip install wheel setuptools')
+        return run_cmd('python --version; pip --version')
 
 
 def install_package1(package_directory, virtual_env, requirements=True, *args, **kwargs):
