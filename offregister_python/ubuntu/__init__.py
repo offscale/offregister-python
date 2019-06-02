@@ -118,6 +118,5 @@ def install_circus2(circus_env=None, circus_cmd=None, circus_args=None, circus_n
 
 
 def restart_services3(*args, **kwargs):
-    restart_systemd('nginx')
     if kwargs.get('circus_args') and kwargs.get('circus_name') and kwargs.get('circus_home'):
         return restart_systemd('circusd')
