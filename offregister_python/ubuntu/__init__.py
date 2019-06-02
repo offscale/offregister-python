@@ -14,7 +14,7 @@ offpy_dir = partial(path.join, path.dirname(resource_filename('offregister_pytho
 
 
 def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
-    run_cmd = partial(_run_command, sudo=kwargs.get('use_sudo'))
+    run_cmd = partial(_run_command, sudo=kwargs.get('use_sudo', False))
 
     ensure_pip_version = lambda: kwargs.get('pip_version') and sudo(
         'pip install pip=={}'.format(kwargs.get('pip_version')))
@@ -30,20 +30,25 @@ def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
 
     virtual_env_bin = "{virtual_env}/bin".format(virtual_env=virtual_env)
     if not exists(virtual_env_bin):
-        run_cmd('mkdir -p "{virtual_env_dir}"'.format(virtual_env_dir=virtual_env[:virtual_env.rfind('/')]),
-                shell_escape=False)
+        sudo('mkdir -p "{virtual_env_dir}"'.format(virtual_env_dir=virtual_env[:virtual_env.rfind('/')]),
+             shell_escape=False)
         if python3:
-            run_cmd('python3 -m venv "{virtual_env}"'.format(virtual_env=virtual_env),
-                    shell_escape=False)
+            sudo('python3 -m venv "{virtual_env}"'.format(virtual_env=virtual_env),
+                 shell_escape=False)
         else:
-            run_cmd('virtualenv "{virtual_env}"'.format(virtual_env=virtual_env), shell_escape=False)
+            sudo('virtualenv "{virtual_env}"'.format(virtual_env=virtual_env), shell_escape=False)
 
     if not exists(virtual_env_bin):
         raise ReferenceError('Virtualenv does not exist')
 
+    if not kwargs.get('use_sudo'):
+        user, group = run_cmd('echo $(id -un; id -gn)').split(' ')
+        sudo('chown -R {user}:{group} {virtual_env} {home}/.cache'.format(user=user, group=group,
+                                                                          virtual_env=virtual_env, home=home))
+
     with shell_env(VIRTUAL_ENV=virtual_env, PATH="{}/bin:$PATH".format(virtual_env)):
         ensure_pip_version()
-        run_cmd('pip install wheel setuptools')
+        run_cmd('pip install -U wheel setuptools')
         return run_cmd('python --version; pip --version')
 
 
@@ -70,9 +75,16 @@ def install_circus2(circus_env=None, circus_cmd=None, circus_args=None, circus_n
 
     virtual_env = virtual_env or '{home}/venvs/tflow'.format(home=run('echo $HOME', quiet=True))
 
+    conf_dir = '/etc/circus/conf.d'  # '/'.join((taiga_root, 'config'))
+    sudo('mkdir -p {conf_dir}'.format(conf_dir=conf_dir))
     if not use_sudo:
-        sudo('mkdir -p {circus_venv}'.format(circus_venv=circus_venv))
-        sudo('chown -R $USER:$GROUP {circus_venv}'.format(circus_venv=circus_venv))
+        user, group = run('echo $(id -un; id -gn)').split(' ')
+        sudo('mkdir -p {circus_venv} {virtual_env}'.format(circus_venv=circus_venv,
+                                                           virtual_env=virtual_env))
+        sudo('chown -R {user}:{group} {circus_venv} {virtual_env} {conf_dir}'.format(user=user, group=group,
+                                                                                     circus_venv=circus_venv,
+                                                                                     virtual_env=virtual_env,
+                                                                                     conf_dir=conf_dir))
     install_venv0(python3=False, virtual_env=circus_venv, use_sudo=use_sudo)
 
     run_cmd = partial(_run_command, sudo=use_sudo)
@@ -80,9 +92,6 @@ def install_circus2(circus_env=None, circus_cmd=None, circus_args=None, circus_n
     with shell_env(VIRTUAL_ENV=circus_venv, PATH="{}/bin:$PATH".format(circus_venv)):
         run_cmd('pip install circus')
         py_ver = run('python --version').partition(' ')[2][:3]
-
-    conf_dir = '/etc/circus/conf.d'  # '/'.join((taiga_root, 'config'))
-    sudo('mkdir -p {conf_dir}'.format(conf_dir=conf_dir))
 
     upload_template(offpy_dir('circus.ini'), '{conf_dir}/'.format(conf_dir=conf_dir),
                     context={'ENDPOINT_PORT': 5555,
@@ -97,13 +106,14 @@ def install_circus2(circus_env=None, circus_cmd=None, circus_args=None, circus_n
                                  '' if circus_env is None else '\n'.join(('{}={}'.format(k, v)
                                                                           for k, v in circus_env.iteritems())),
                              'PYTHON_VERSION': py_ver},
-                    use_sudo=True)
+                    use_sudo=use_sudo)
     circusd_context = {'CONF_DIR': conf_dir, 'CIRCUS_VENV': circus_venv}
     if exists('/etc/systemd/system'):
-        upload_template(offpy_dir('circusd.service'), '/etc/systemd/system/', context=circusd_context, use_sudo=True)
+        upload_template(offpy_dir('circusd.service'), '/etc/systemd/system/', context=circusd_context,
+                        use_sudo=True, backup=False)
         sudo('systemctl daemon-reload')
     else:
-        upload_template(offpy_dir('circusd.conf'), '/etc/init/', context=circusd_context, use_sudo=True)
+        upload_template(offpy_dir('circusd.conf'), '/etc/init/', context=circusd_context, use_sudo=True, backup=False)
     return circus_venv
 
 
