@@ -1,14 +1,15 @@
 from functools import partial
 from os import path
-from pkg_resources import resource_filename
 
 from fabric.api import run
 from fabric.context_managers import shell_env, cd
 from fabric.contrib.files import exists, upload_template
 from fabric.operations import sudo, _run_command
-
 from offregister_fab_utils.apt import apt_depends
+from offregister_fab_utils.python import pip_depends
 from offregister_fab_utils.ubuntu.systemd import restart_systemd
+from pkg_resources import resource_filename
+from six import iteritems
 
 offpy_dir = partial(path.join, path.dirname(resource_filename('offregister_python', '__init__.py')), '_config')
 
@@ -19,7 +20,7 @@ def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
     ensure_pip_version = lambda: kwargs.get('pip_version') and sudo(
         'pip install pip=={}'.format(kwargs.get('pip_version')))
 
-    home = run('echo $HOME', quiet=True)
+    home = kwargs.get('HOMEDIR', run('echo $HOME', quiet=True))
     virtual_env = virtual_env or '{home}/venvs/tflow'.format(home=home)
 
     if python3:
@@ -28,7 +29,7 @@ def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
         apt_depends('python-dev', 'python-pip', 'python-wheel', 'python2.7', 'python2.7-dev')  # 'python-apt'
         sudo('pip install virtualenv')
 
-    virtual_env_bin = "{virtual_env}/bin".format(virtual_env=virtual_env)
+    virtual_env_bin = '{virtual_env}/bin'.format(virtual_env=virtual_env)
     if not exists(virtual_env_bin):
         sudo('mkdir -p "{virtual_env_dir}"'.format(virtual_env_dir=virtual_env[:virtual_env.rfind('/')]),
              shell_escape=False)
@@ -42,14 +43,20 @@ def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
         raise ReferenceError('Virtualenv does not exist')
 
     if not kwargs.get('use_sudo'):
-        user, group = run_cmd('echo $(id -un; id -gn)').split(' ')
-        sudo('chown -R {user}:{group} {virtual_env} {home}/.cache'.format(user=user, group=group,
-                                                                          virtual_env=virtual_env, home=home))
+        user_group = run('echo $(id -un):$(id -gn)', quiet=True)
+        sudo('chown -R {user_group} {virtual_env} {home}/.cache'.format(user_group=user_group,
+                                                                        virtual_env=virtual_env,
+                                                                        home=home))
 
     with shell_env(VIRTUAL_ENV=virtual_env, PATH="{}/bin:$PATH".format(virtual_env)):
         ensure_pip_version()
         run_cmd('pip install -U wheel setuptools')
-        return run_cmd('python --version; pip --version')
+        return 'Installed: {} {}'.format(
+            run_cmd('pip --version; python --version'),
+            pip_depends('{}/bin/python'.format(virtual_env),
+                        kwargs.get('use_sudo', False),
+                        kwargs.get('PACKAGES', tuple()))
+        )
 
 
 def install_package1(package_directory, virtual_env=None, requirements=True, *args, **kwargs):
@@ -93,20 +100,22 @@ def install_circus2(circus_env=None, circus_cmd=None, circus_args=None, circus_n
         run_cmd('pip install circus')
         py_ver = run('python --version').partition(' ')[2][:3]
 
-    upload_template(offpy_dir('circus.ini'), '{conf_dir}/'.format(conf_dir=conf_dir),
-                    context={'ENDPOINT_PORT': 5555,
-                             'WORKING_DIR': kwargs.get('circus_working_dir', circus_home),
-                             'CMD': circus_cmd,
-                             'ARGS': circus_args,
-                             'NAME': circus_name,
-                             'USER': remote_user,
-                             'HOME': circus_home,
-                             'VENV': virtual_env,
-                             'CIRCUS_ENV':
-                                 '' if circus_env is None else '\n'.join(('{}={}'.format(k, v)
-                                                                          for k, v in circus_env.iteritems())),
-                             'PYTHON_VERSION': py_ver},
-                    use_sudo=use_sudo)
+    upload_template(
+        offpy_dir('circus.ini'), '{conf_dir}/'.format(conf_dir=conf_dir),
+        context={
+            'ENDPOINT_PORT': 5555,
+            'WORKING_DIR': kwargs.get('circus_working_dir', circus_home),
+            'CMD': circus_cmd,
+            'ARGS': circus_args,
+            'NAME': circus_name,
+            'USER': remote_user,
+            'HOME': circus_home,
+            'VENV': virtual_env,
+            'CIRCUS_ENV':
+                '' if circus_env is None else '\n'.join(('{}={}'.format(k, v) for k, v in iteritems(circus_env))),
+            'PYTHON_VERSION': py_ver},
+        use_sudo=use_sudo
+    )
     circusd_context = {'CONF_DIR': conf_dir, 'CIRCUS_VENV': circus_venv}
     if exists('/etc/systemd/system'):
         upload_template(offpy_dir('circusd.service'), '/etc/systemd/system/', context=circusd_context,
