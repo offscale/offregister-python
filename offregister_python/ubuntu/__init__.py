@@ -174,7 +174,7 @@ def install_circus2(
             "VENV": virtual_env,
             "CIRCUS_ENV": ""
             if circus_env is None
-            else "\n".join(("{}={}".format(k, v) for k, v in iteritems(circus_env))),
+            else "\n".join("{}={}".format(k, v) for k, v in iteritems(circus_env)),
             "PYTHON_VERSION": py_ver,
         },
         use_sudo=use_sudo,
