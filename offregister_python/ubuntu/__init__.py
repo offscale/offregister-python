@@ -1,5 +1,7 @@
 from functools import partial
+from operator import methodcaller
 from os import path
+from sys import version
 
 from fabric.api import run
 from fabric.context_managers import shell_env, cd
@@ -9,7 +11,11 @@ from offregister_fab_utils.apt import apt_depends
 from offregister_fab_utils.python import pip_depends
 from offregister_fab_utils.ubuntu.systemd import restart_systemd
 from pkg_resources import resource_filename
-from six import iteritems
+
+if version[0] == "3":
+    iteritems = methodcaller("items")
+else:
+    iteritems = methodcaller("iteritems")
 
 offpy_dir = partial(
     path.join,
