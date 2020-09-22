@@ -1,3 +1,4 @@
+from collections import deque
 from functools import partial
 from operator import methodcaller
 from os import path
@@ -12,10 +13,7 @@ from offregister_fab_utils.python import pip_depends
 from offregister_fab_utils.ubuntu.systemd import restart_systemd
 from pkg_resources import resource_filename
 
-if version[0] == "3":
-    iteritems = methodcaller("items")
-else:
-    iteritems = methodcaller("iteritems")
+from offutils.util import iteritems
 
 offpy_dir = partial(
     path.join,
@@ -98,8 +96,12 @@ def install_package1(
         requirements = "requirements.txt" if requirements is True else requirements
         if requirements:
             if isinstance(requirements, list):
-                list(
-                    [run_cmd('pip install -r "{}"'.format(req)) for req in requirements]
+                deque(
+                    (
+                        run_cmd('pip install -r "{}"'.format(req))
+                        for req in requirements
+                    ),
+                    maxlen=0,
                 )
             else:
                 run_cmd('pip install -r "{}"'.format(requirements))
