@@ -78,7 +78,7 @@ def install_venv0(python3=False, virtual_env=None, *args, **kwargs):
             pip_depends(
                 "{}/bin/python".format(virtual_env),
                 kwargs.get("use_sudo", False),
-                kwargs.get("PACKAGES", tuple()),
+                kwargs.get("packages", tuple()),
             ),
         )
 
