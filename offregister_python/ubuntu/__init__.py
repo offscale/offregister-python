@@ -1,19 +1,16 @@
 from collections import deque
 from functools import partial
-from operator import methodcaller
 from os import path
-from sys import version
 
 from fabric.api import run
-from fabric.context_managers import shell_env, cd
+from fabric.context_managers import cd, shell_env
 from fabric.contrib.files import exists, upload_template
-from fabric.operations import sudo, _run_command
+from fabric.operations import _run_command, sudo
 from offregister_fab_utils.apt import apt_depends
 from offregister_fab_utils.python import pip_depends
 from offregister_fab_utils.ubuntu.systemd import restart_systemd
-from pkg_resources import resource_filename
-
 from offutils.util import iteritems
+from pkg_resources import resource_filename
 
 offpy_dir = partial(
     path.join,
