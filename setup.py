@@ -44,8 +44,9 @@ if __name__ == "__main__":
             "License :: OSI Approved :: Apache Software License",
             "Programming Language :: Python",
             "Programming Language :: Python :: 2.7",
+            "Programming Language :: Python :: 3"
         ],
-        install_requires=["pyyaml", "fab-classic", "paramiko"],
+        install_requires=["pyyaml", "fabric2", "paramiko"],
         test_suite=package_name + ".tests",
         packages=find_packages(),
         package_dir={package_name: package_name},
