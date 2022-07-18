@@ -1,13 +1,22 @@
-from collections import deque
+from collections import deque, namedtuple
 from functools import partial
 from os import path
+from sys import version
+
+if version[0] == "2":
+    try:
+        from cStringIO import StringIO
+    except ImportError:
+        from StringIO import StringIO
+else:
+    from io import StringIO
 
 from offregister_fab_utils.apt import apt_depends
 from offregister_fab_utils.misc import upload_template_fmt
 from offregister_fab_utils.python import pip_depends
 from offregister_fab_utils.ubuntu.systemd import restart_systemd
-from offutils.util import iteritems
 from offutils import pp
+from offutils.util import iteritems
 from patchwork.files import exists
 from pkg_resources import resource_filename
 
@@ -44,7 +53,8 @@ def install_venv0(c, python3=False, virtual_env=None, *args, **kwargs):
     else:
         apt_depends(
             c, "python-dev", "python-pip", "python-wheel", "python2.7", "python2.7-dev"
-        )  # 'python-apt'
+        )
+        # 'python-apt'
         c.sudo("pip install virtualenv")
         python_bin = "python"
 
@@ -71,16 +81,18 @@ def install_venv0(c, python3=False, virtual_env=None, *args, **kwargs):
             )
         )
 
-    env = dict(VIRTUAL_ENV=virtual_env,
-               PATH="{}/bin:$PATH".format(virtual_env),
-               PYTHONPATH="{}/bin:$PATH".format(virtual_env))
-    ensure_pip_version(c.run if python3 else c.sudo)
+    env = {"VIRTUAL_ENV": virtual_env, "PATH": "{}/bin:$PATH".format(virtual_env)}
+    env["PYTHONPATH"] = env["PATH"]
+    ensure_pip_version(c.run)
     pp({"offregister-python/offregister_python/deb_shared.py": env})
-    run_cmd("pip --version ;"
-            "{python_bin} --version ;"
-            "which {python_bin} ;"
-            "which pip".format(python_bin=python_bin),
-            env=env)
+    run_cmd(
+        "pip --version ; "
+        "{python_bin} --version ; "
+        "which {python_bin} ; "
+        "which pip".format(python_bin=python_bin),
+        env=env,
+        replace_env=True,
+    )
     run_cmd("pip install -U wheel setuptools", env=env)
     return "Installed: {} {}".format(
         run_cmd("pip --version; {python_bin} --version".format(python_bin=python_bin)),
@@ -116,10 +128,13 @@ def install_package1(
                     ),
                     maxlen=0,
                 )
-            else:
+            elif exists(c, runner=run_cmd, path="requirements.txt"):
                 run_cmd('pip install -r "{}"'.format(requirements), env=env)
 
-        return run_cmd('pip uninstall -y "${PWD##*/}"; pip install .;', env=env)
+        if exists(c, runner=run_cmd, path="setup.py"):
+            return run_cmd('pip uninstall -y "${PWD##*/}"; pip install .;', env=env)
+        io = StringIO()
+        return namedtuple("_", ("stdout", "stderr", "exited"))(io, io, 0)
 
 
 def install_circus2(
