@@ -114,7 +114,7 @@ def install_package1(
     """
     run_cmd = c.sudo if kwargs.get("use_sudo", False) else c.run
     virtual_env = virtual_env or "{home}/venvs/tflow".format(
-        home=c.run("echo $HOME", hide=True)
+        home=c.run("echo $HOME", hide=True).stdout
     )
     env = dict(VIRTUAL_ENV=virtual_env, PATH="{}/bin:$PATH".format(virtual_env))
     with c.cd(package_directory):
@@ -160,13 +160,13 @@ def install_circus2(
         return "insufficient args, skipping circus"
 
     virtual_env = virtual_env or "{home}/venvs/tflow".format(
-        home=c.run("echo $HOME", hide=True)
+        home=c.run("echo $HOME", hide=True).stdout
     )
 
     conf_dir = "/etc/circus/conf.d"  # '/'.join((taiga_root, 'config'))
     c.sudo("mkdir -p {conf_dir}".format(conf_dir=conf_dir))
     if not use_sudo:
-        user, group = c.run("echo $(id -un; id -gn)").split(" ")
+        user, group = c.run("echo $(id -un; id -gn)").stdout.split(" ")
         c.sudo(
             "mkdir -p {circus_venv} {virtual_env}".format(
                 circus_venv=circus_venv, virtual_env=virtual_env
@@ -187,7 +187,7 @@ def install_circus2(
     run_cmd("mkdir -p {circus_home}/logs".format(circus_home=circus_home))
     env = dict(VIRTUAL_ENV=circus_venv, PATH="{}/bin:$PATH".format(circus_venv))
     run_cmd("pip install circus", env=env)
-    py_ver = c.run("python --version", env=env).partition(" ")[2][:3]
+    py_ver = c.run("python --version", env=env).stdout.partition(" ")[2][:3]
 
     upload_template_fmt(
         c,
