@@ -41,7 +41,7 @@ def install_venv0(c, python3=False, virtual_env=None, *args, **kwargs):
     run_cmd = c.sudo if kwargs.get("use_sudo", False) else c.run
 
     ensure_pip_version = lambda _run_cmd: kwargs.get("pip_version") and _run_cmd(
-        "pip install pip=={}".format(kwargs.get("pip_version"))
+        "python -m pip install pip=={}".format(kwargs.get("pip_version"))
     )
 
     home = kwargs.get("HOMEDIR", c.run("echo $HOME", hide=True).stdout.rstrip())
@@ -55,7 +55,7 @@ def install_venv0(c, python3=False, virtual_env=None, *args, **kwargs):
             c, "python-dev", "python-pip", "python-wheel", "python2.7", "python2.7-dev"
         )
         # 'python-apt'
-        c.sudo("pip install virtualenv")
+        c.sudo("python -m pip install virtualenv")
         python_bin = "python"
 
     virtual_env_bin = "{virtual_env}/bin".format(virtual_env=virtual_env)
@@ -76,7 +76,9 @@ def install_venv0(c, python3=False, virtual_env=None, *args, **kwargs):
     if not kwargs.get("use_sudo"):
         user_group = c.run("echo $(id -un):$(id -gn)", hide=True).stdout.rstrip()
         c.sudo(
-            "chown -R {user_group} {virtual_env} {home}/.cache".format(
+            "chown -R {user_group} {virtual_env}"
+            " && ( test -d {home}/.cache && chown -R {user_group} {home}/.cache"
+            "      || true )".format(
                 user_group=user_group, virtual_env=virtual_env, home=home
             )
         )
@@ -93,7 +95,7 @@ def install_venv0(c, python3=False, virtual_env=None, *args, **kwargs):
         env=env,
         replace_env=True,
     )
-    run_cmd("pip install -U wheel setuptools", env=env)
+    run_cmd("python -m pip install -U wheel setuptools", env=env)
     return "Installed: {} {}".format(
         run_cmd("pip --version; {python_bin} --version".format(python_bin=python_bin)),
         pip_depends(
@@ -106,15 +108,33 @@ def install_venv0(c, python3=False, virtual_env=None, *args, **kwargs):
 
 
 def install_package1(
-    c, package_directory, virtual_env=None, requirements=True, *args, **kwargs
+    c,
+    package_directory,
+    virtual_env=None,
+    requirements=True,
+    dependencies=None,
+    *args,
+    **kwargs
 ):
     """
     :param c: Connection
     :type c: ```fabric.connection.Connection```
+
+    :param package_directory: Directory with the first set of Python files (e.g.: setup.py, requirements.txt)
+    :type package_directory: ```str```
+
+    :param virtual_env: Virtualenv path, defaults to "{home}/venvs/tflow"
+    :type virtual_env: ```Optional[str]```
+
+    :param requirements: Whether to `pip install -r requirements.txt`
+    :type requirements: ```bool```
+
+    :param dependencies: If non-empty will `pip install -y ${dependencies}`
+    :type dependencies: ```Optional[str]```
     """
     run_cmd = c.sudo if kwargs.get("use_sudo", False) else c.run
     virtual_env = virtual_env or "{home}/venvs/tflow".format(
-        home=c.run("echo $HOME", hide=True).stdout
+        home=c.run("echo $HOME", hide=True).stdout.rstrip()
     )
     env = dict(VIRTUAL_ENV=virtual_env, PATH="{}/bin:$PATH".format(virtual_env))
     with c.cd(package_directory):
@@ -123,13 +143,16 @@ def install_package1(
             if isinstance(requirements, list):
                 deque(
                     (
-                        run_cmd('pip install -r "{}"'.format(req), env=env)
+                        run_cmd('python -m pip install -r "{}"'.format(req), env=env)
                         for req in requirements
                     ),
                     maxlen=0,
                 )
             elif exists(c, runner=run_cmd, path="requirements.txt"):
-                run_cmd('pip install -r "{}"'.format(requirements), env=env)
+                run_cmd('python -m pip install -r "{}"'.format(requirements), env=env)
+
+        if dependencies:
+            run_cmd("python -m pip install -y {}".format(dependencies), env=env)
 
         if exists(c, runner=run_cmd, path="setup.py"):
             return run_cmd('pip uninstall -y "${PWD##*/}"; pip install .;', env=env)
@@ -160,13 +183,13 @@ def install_circus2(
         return "insufficient args, skipping circus"
 
     virtual_env = virtual_env or "{home}/venvs/tflow".format(
-        home=c.run("echo $HOME", hide=True).stdout
+        home=c.run("echo $HOME", hide=True).stdout.rstrip()
     )
 
     conf_dir = "/etc/circus/conf.d"  # '/'.join((taiga_root, 'config'))
     c.sudo("mkdir -p {conf_dir}".format(conf_dir=conf_dir))
     if not use_sudo:
-        user, group = c.run("echo $(id -un; id -gn)").stdout.split(" ")
+        user, group = c.run("echo $(id -un; id -gn)").stdout.rstrip().split(" ")
         c.sudo(
             "mkdir -p {circus_venv} {virtual_env}".format(
                 circus_venv=circus_venv, virtual_env=virtual_env
@@ -186,7 +209,7 @@ def install_circus2(
     run_cmd = c.sudo if kwargs.get("use_sudo", False) else c.run
     run_cmd("mkdir -p {circus_home}/logs".format(circus_home=circus_home))
     env = dict(VIRTUAL_ENV=circus_venv, PATH="{}/bin:$PATH".format(circus_venv))
-    run_cmd("pip install circus", env=env)
+    run_cmd("python -m pip install circus", env=env)
     py_ver = c.run("python --version", env=env).stdout.partition(" ")[2][:3]
 
     upload_template_fmt(
@@ -207,7 +230,7 @@ def install_circus2(
             else "\n".join("{}={}".format(k, v) for k, v in iteritems(circus_env)),
             "PYTHON_VERSION": py_ver,
         },
-        use_sudo=use_sudo,
+        # use_sudo=use_sudo,
     )
     circusd_context = {"CONF_DIR": conf_dir, "CIRCUS_VENV": circus_venv}
     if exists(c, runner=c.run, path="/etc/systemd/system"):
