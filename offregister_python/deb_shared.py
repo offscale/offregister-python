@@ -129,7 +129,7 @@ def install_package1(
     :param requirements: Whether to `pip install -r requirements.txt`
     :type requirements: ```bool```
 
-    :param dependencies: If non-empty will `pip install -y ${dependencies}`
+    :param dependencies: If non-empty will `pip install ${dependencies}`
     :type dependencies: ```Optional[str]```
     """
     run_cmd = c.sudo if kwargs.get("use_sudo", False) else c.run
@@ -152,7 +152,7 @@ def install_package1(
                 run_cmd('python -m pip install -r "{}"'.format(requirements), env=env)
 
         if dependencies:
-            run_cmd("python -m pip install -y {}".format(dependencies), env=env)
+            run_cmd("python -m pip install {}".format(dependencies), env=env)
 
         if exists(c, runner=run_cmd, path="setup.py"):
             return run_cmd('pip uninstall -y "${PWD##*/}"; pip install .;', env=env)
