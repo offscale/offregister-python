@@ -27,7 +27,9 @@ offpy_dir = partial(
 )
 
 
-def install_venv0(c, python3=False, virtual_env=None, *args, **kwargs):
+def install_venv0(
+    c, python3=False, virtual_env=None, system_site_packages=False, *args, **kwargs
+):
     """
     :param c: Connection
     :type c: ```fabric.connection.Connection```
@@ -37,26 +39,46 @@ def install_venv0(c, python3=False, virtual_env=None, *args, **kwargs):
 
     :param virtual_env: Virtualenv path, defaults to "{home}/venvs/tflow"
     :type virtual_env: ```Optional[str]```
+
+    :param system_site_packages: Whether to create virtualenv with `--system-site-packages`
+    :type system_site_packages: ```bool```
     """
     run_cmd = c.sudo if kwargs.get("use_sudo", False) else c.run
-
-    ensure_pip_version = lambda _run_cmd: kwargs.get("pip_version") and _run_cmd(
-        "python -m pip install pip=={}".format(kwargs.get("pip_version"))
-    )
 
     home = kwargs.get("HOMEDIR", c.run("echo $HOME", hide=True).stdout.rstrip())
     virtual_env = virtual_env or "{home}/venvs/tflow".format(home=home)
 
     if python3:
-        apt_depends(c, "python3-dev", "python3-pip", "python3-wheel", "python3-venv")
+        apt_depends(
+            c,
+            "python3-dev",
+            "python3-pip",
+            "python3-wheel",
+            "python3-venv",
+            "libssl-dev",
+            "libffi-dev",
+        )
         python_bin = "python3"
     else:
         apt_depends(
-            c, "python-dev", "python-pip", "python-wheel", "python2.7", "python2.7-dev"
+            c,
+            "python-dev",
+            "python-pip",
+            "python-wheel",
+            "python2.7",
+            "python2.7-dev",
+            "libssl-dev",
+            "libffi-dev",
         )
         # 'python-apt'
         c.sudo("python -m pip install virtualenv")
         python_bin = "python"
+
+    ensure_pip_version = lambda _run_cmd: kwargs.get("pip_version") and _run_cmd(
+        "{python_bin} -m pip install pip=={pip_version}".format(
+            python_bin=python_bin, pip_version=kwargs["pip_version"]
+        )
+    )
 
     virtual_env_bin = "{virtual_env}/bin".format(virtual_env=virtual_env)
     if not exists(c, runner=c.run, path=virtual_env_bin):
@@ -66,9 +88,24 @@ def install_venv0(c, python3=False, virtual_env=None, *args, **kwargs):
             )
         )
         if python3:
-            c.sudo('python3 -m venv "{virtual_env}"'.format(virtual_env=virtual_env))
+            c.sudo(
+                '{python_bin} -m venv "{virtual_env}"{extra_args}'.format(
+                    python_bin=python_bin,
+                    virtual_env=virtual_env,
+                    extra_args=" --system-site-packages"
+                    if system_site_packages
+                    else "",
+                )
+            )
         else:
-            c.sudo('virtualenv "{virtual_env}"'.format(virtual_env=virtual_env))
+            c.sudo(
+                'virtualenv "{virtual_env}"{extra_args}'.format(
+                    virtual_env=virtual_env,
+                    extra_args=" --system-site-packages"
+                    if system_site_packages
+                    else "",
+                )
+            )
 
     if not exists(c, runner=c.run, path=virtual_env_bin):
         raise ReferenceError("Virtualenv does not exist")
@@ -88,16 +125,22 @@ def install_venv0(c, python3=False, virtual_env=None, *args, **kwargs):
     ensure_pip_version(c.run)
     pp({"offregister-python/offregister_python/deb_shared.py": env})
     run_cmd(
-        "pip --version ; "
+        "{python_bin} -m pip --version "
         "{python_bin} --version ; "
-        "which {python_bin} ; "
-        "which pip".format(python_bin=python_bin),
+        "which {python_bin} ; ".format(python_bin=python_bin),
         env=env,
         replace_env=True,
     )
-    run_cmd("python -m pip install -U wheel setuptools", env=env)
+    run_cmd(
+        "{python_bin} -m pip install -U wheel setuptools".format(python_bin=python_bin),
+        env=env,
+    )
     return "Installed: {} {}".format(
-        run_cmd("pip --version; {python_bin} --version".format(python_bin=python_bin)),
+        run_cmd(
+            "{python_bin} -m pip --version; {python_bin} --version".format(
+                python_bin=python_bin
+            )
+        ),
         pip_depends(
             c,
             "{}/bin/{}".format(virtual_env, python_bin),
@@ -155,7 +198,10 @@ def install_package1(
             run_cmd("python -m pip install {}".format(dependencies), env=env)
 
         if exists(c, runner=run_cmd, path="setup.py"):
-            return run_cmd('pip uninstall -y "${PWD##*/}"; pip install .;', env=env)
+            return run_cmd(
+                'python -m pip uninstall -y "${PWD##*/}"; python -m pip install .;',
+                env=env,
+            )
         io = StringIO()
         return namedtuple("_", ("stdout", "stderr", "exited"))(io, io, 0)
 
