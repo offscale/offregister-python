@@ -42,6 +42,9 @@ def install_venv0(
 
     :param system_site_packages: Whether to create virtualenv with `--system-site-packages`
     :type system_site_packages: ```bool```
+
+    :return: Install string showing what was installed
+    :rtype: ```str```
     """
     run_cmd = c.sudo if kwargs.get("use_sudo", False) else c.run
 
@@ -75,8 +78,11 @@ def install_venv0(
         python_bin = "python"
 
     ensure_pip_version = lambda _run_cmd: kwargs.get("pip_version") and _run_cmd(
-        "{python_bin} -m pip install pip=={pip_version}".format(
-            python_bin=python_bin, pip_version=kwargs["pip_version"]
+        "{python_bin} -m pip install {pip_args}".format(
+            python_bin=python_bin,
+            pip_args=kwargs["pip_version"]
+            if kwargs["pip_version"].startswith("-")
+            else "=={pip_version}".format(pip_version=kwargs["pip_version"]),
         )
     )
 
@@ -174,6 +180,9 @@ def install_package1(
 
     :param dependencies: If non-empty will `pip install ${dependencies}`
     :type dependencies: ```Optional[str]```
+
+    :return: (stdout, stderr, exited)
+    :rtype: ```Tuple[IO, IO, int]```
     """
     run_cmd = c.sudo if kwargs.get("use_sudo", False) else c.run
     virtual_env = virtual_env or "{home}/venvs/tflow".format(
@@ -305,6 +314,9 @@ def restart_services3(c, *args, **kwargs):
     """
     :param c: Connection
     :type c: ```fabric.connection.Connection```
+
+    :return: res.stdout if res.exited == 0 else res.stderr
+    :rtype: ```str```
     """
     if (
         kwargs.get("circus_args")
