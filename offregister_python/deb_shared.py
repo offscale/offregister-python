@@ -204,7 +204,16 @@ def install_package1(
                 run_cmd('python -m pip install -r "{}"'.format(requirements), env=env)
 
         if dependencies:
-            run_cmd("python -m pip install {}".format(dependencies), env=env)
+            if isinstance(dependencies, (str, bytes)):
+                run_cmd("python -m pip install {}".format(dependencies), env=env)
+            else:
+                deque(
+                    map(
+                        partial(run_cmd, env=env),
+                        map("python -m pip install {}".format, dependencies),
+                    ),
+                    maxlen=0,
+                )
 
         if exists(c, runner=run_cmd, path="setup.py"):
             return run_cmd(
