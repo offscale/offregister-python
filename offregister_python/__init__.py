@@ -8,6 +8,7 @@ import yaml
 
 __author__ = "Samuel Marks"
 __version__ = "0.0.12"
+__description__ = "Python deployment module for Fabric (offregister)"
 
 
 def get_logger(name=None):
