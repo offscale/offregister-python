@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from collections import deque, namedtuple
 from functools import partial
 from os import path
